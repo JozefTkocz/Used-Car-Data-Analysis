@@ -21,10 +21,15 @@ plt.close('all')
 class carModel:
     
     def __init__(self, df, model):
-        self.cars = df
+        self.cars = df.copy()
         self.minPrice = 100
-        self.maxPrice = 20000
+        self.maxPrice = 30000
+        self.maxAge = 50*365
+        self.minAge = 0.5*365
         self.model = model
+        self.decayConstant = 0
+        self.initialPrice = 0
+        self.linFitScore = -100
         
     def cleanData(self):
         #Pull out all rows corresponding to the model of interest
@@ -36,9 +41,12 @@ class carModel:
         #Remove all rows with anomalous price information
         self.cars.drop(self.cars.loc[self.cars['price']<self.minPrice].index, axis=0, inplace=True)
         self.cars.drop(self.cars.loc[self.cars['price']>self.maxPrice].index, axis=0, inplace=True)
-        
+        #Only consider cars older than 6 months, younger than 50 years
         carAges = self.calculateCarAge()
-        cars['age'] = carAges
+        self.cars['age'] = carAges
+        
+        self.cars.drop(self.cars.loc[self.cars['age']>self.maxAge].index, axis=0, inplace=True)
+        self.cars.drop(self.cars.loc[self.cars['age']<self.minAge].index, axis=0, inplace=True)
     
     def calculateCarAge(self):
         #Pull out month and year of registration
@@ -63,119 +71,68 @@ class carModel:
         carAges = [carAge.days for carAge in carAges]
         
         return(carAges)
-    
-    def plotPriceHist(self):
-        prices = self.cars['price']
-        ages = self.cars['age']
         
-        plt.figure()
-        plt.plot(ages, np.log(prices), 'o')
-
+    def linRegress(self, plot=False):
+        
+        X = self.cars['age']
+        Y = np.log(self.cars['price'])
+        if len(X > 1):
+            #Perform a linear regression - use cross validation to determine the validity of the fit
+            lm = LinearRegression()
+            scores = cross_val_score(lm, np.array(X).reshape(-1, 1), Y, cv=3, scoring = 'neg_mean_squared_error') 
+            self.linFitScore = np.mean(scores)
+            
+            #print('accuracy is {} +/- {}'.format(np.mean(scores), np.std(scores)))
+            lm.fit(np.array(X).reshape(-1, 1), Y)
+            self.decayConstant = lm.coef_[0]
+            self.initialPrice = lm.intercept_
+            
+            #Plot the linear fit if required
+            if plot:
+                plt.figure(self.model)
+                plt.plot(X, Y, 'o')
+                plt.plot(X, lm.predict(np.array(X).reshape(-1, 1)))
+                plt.xlabel('Age (days)')
+                plt.ylabel('ln(Price (EUR))')
+                
+    def dataMetrics(self):
+        self.numEntries = len(self.cars)
+        
+        
 ##Load the data into a pandas dataframe
 cars = pd.read_csv("autos.csv", encoding = "ISO-8859-1")
-model = 'fabia'
+cars.dropna(inplace=True, axis='rows')
+model = 'golf'
 
-fabia = carModel(cars, 'micra')
-fabia.cleanData()
-fabia.plotPriceHist()
+models = cars.model.unique()
 
-#    
-##This is similarly granular. Maybe the registration date is more continuous?
-#for carModel in exampleModels:
-#    #Pull out month and year of registration
-#    years = modelSubSets[carModel]['yearOfRegistration']
-#    months = modelSubSets[carModel]['monthOfRegistration']
-#    prices = modelSubSets[carModel]['price']
-#    crawlDatesTmp = modelSubSets[carModel]['dateCrawled'].tolist()
-#    
-#    crawlDates = []
-#    for date in crawlDatesTmp:
-#        crawlDates.append(datetime.strptime(date, '%Y-%m-%d %H:%M:%S'))
-#    
-#    #Calculate time since registration - compute difference between registration date and date scraped
-#    registrationDates = []
-#    for i in range(0, len(years)):
-#        if months.iloc[i] == 0:
-#            months.iloc[i] = 1
-#        registrationDates.append(datetime(years.iloc[i], months.iloc[i], 1))
-#    
-#    carAges = []
-#    carAgestmp = np.array(crawlDates) - np.array(registrationDates)
-#    for i in range(0, len(carAgestmp)):
-#        carAges.append(carAgestmp[i].days)
-#        
-#    carAges = np.array(carAges)
-#    prices = np.array(prices)
-#    
-#    rejectInices = np.where(carAges < 0)
-#    
-#    carAges = np.delete(carAges, rejectInices)
-#    prices = np.delete(prices, rejectInices)
-#    
-#    print(len(carAges), len(prices))
-#    
-#    plt.figure(carModel)
-#    plt.plot(carAges, prices, 'o')
-#    plt.xlabel('Car Age (days)')
-#    plt.ylabel('ln(Car Price (Euros))')
-#    
-##Using sklearn to fit a linear regression model
-##Creat a linear regression object
-#    
-##Pick out the x and y data
-#carModel = 'fabia'
-#years = modelSubSets[carModel]['yearOfRegistration']
-#months = modelSubSets[carModel]['monthOfRegistration']
-#prices = modelSubSets[carModel]['price']
-#crawlDatesTmp = modelSubSets[carModel]['dateCrawled'].tolist()
-#    
-#crawlDates = []
-#for date in crawlDatesTmp:    
-#    crawlDates.append(datetime.strptime(date, '%Y-%m-%d %H:%M:%S'))
-#    
-##Calculate time since registration - compute difference between registration date and date scraped
-#registrationDates = []
-#for i in range(0, len(years)):
-#    if months.iloc[i] == 0:
-#        months.iloc[i] = 1
-#    registrationDates.append(datetime(years.iloc[i], months.iloc[i], 1))
-#    
-#carAges = []
-#carAgestmp = np.array(crawlDates) - np.array(registrationDates)
-#for i in range(0, len(carAgestmp)):
-#    carAges.append(carAgestmp[i].days)
-#        
-#carAges = np.array(carAges)
-#prices = np.array(prices)
-#rejectInices = np.where(carAges < 0)
-#    
-#fabiaAges = np.delete(carAges, rejectInices)
-#fabiaPrices = np.delete(prices, rejectInices)
-#
-##Make a pandas dataframe out of the numpy arrays
-#modelData = np.array([fabiaAges, np.log(fabiaPrices)]).T
-#model = pd.DataFrame(modelData, columns = ['age','price'])
-#model.sort_values('age', axis = 'index', inplace=True)
-#
-#lm = LinearRegression()
-#X = model.drop('price', axis='columns')
-#lm.fit(X, model.price)
-#
-#plt.figure('Fabia Example')
-#plt.plot(model.age, model.price, 'o')
-#plt.plot(model.age, lm.predict(X))
-#
-##Following from example above, split into test and training sets
-#X_train, X_test, Y_train, Y_test = train_test_split(X, model.price, test_size = 0.2, random_state = 5)
-#scores = cross_val_score(lm, X, model.price, cv=15, scoring = 'neg_mean_squared_error')    
-#print('accuracy is {} +/- {}'.format(np.mean(scores), np.std(scores)))
-#
-##Try a polynomial fit
-#polynomial_features= PolynomialFeatures(degree=5)
-#x_poly = polynomial_features.fit_transform(X)
-#lm.fit(x_poly, model.price)
-#
-#plt.figure('Fabia Example poly')
-#plt.plot(model.age, model.price, 'o')
-#plt.plot(model.age, lm.predict(x_poly))
-##Would also need to run against some other models to determine which is most accurate
+test = carModel(cars, model)
+test.cleanData()
+test.linRegress(plot=True)
+
+modelDict = {}
+index = np.linspace(0, len(models), len(models))
+
+decayConstants = []
+models_for_analysis = []
+
+for model in models:
+    modelDict[model] = carModel(cars, model)
+    modelDict[model].cleanData()
+    modelDict[model].linRegress()
+    modelDict[model].dataMetrics()
+    
+    #Only analyse models for which there are enough entries
+    if modelDict[model].numEntries > 100:
+        #Only include data that are well-described by a linear fit
+        if modelDict[model].linFitScore > - 0.5:
+            decayConstants.append(modelDict[model].decayConstant)
+            models_for_analysis.append(model)
+
+models_for_analysis = pd.Series(models_for_analysis)
+sortindices= np.argsort(decayConstants)
+index = range(0, len(decayConstants))
+
+plt.figure('Decay Constant Bar Chart')
+plt.bar(index, np.sort(decayConstants))
+plt.xticks(index, models_for_analysis[sortindices], rotation=30)
