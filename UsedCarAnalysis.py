@@ -65,6 +65,7 @@ class carModel:
         #Also pull out the date the data was crawled
         crawlDates = self.cars['dateCrawled'].tolist()
         crawlDates = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S').date() for date in crawlDates]
+
         
         #Calculate the car age at the time of scraping
         carAges = (np.array(crawlDates) - np.array(registrationDates))
