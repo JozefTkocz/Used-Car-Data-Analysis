@@ -77,13 +77,13 @@ class carModel:
         X = self.cars['age']
         Y = np.log(self.cars['price'])
         
-        #Compute weights for the logarithmic price data
+        #Compute weights for the logarithmic price data - using functional approach
         priceErr = 10
         lnPriceErr = np.log(self.cars['price'] + priceErr) - np.log(priceErr)
         if len(X > 1):
-            #Perform a linear regression - use cross validation to determine the validity of the fit
+            #Perform a linear regression - use cross validation to determine to measure fit quality
             lm = LinearRegression()
-            scores = cross_val_score(lm, np.array(X).reshape(-1, 1), Y, cv=3, scoring = 'neg_mean_squared_error') 
+            scores = cross_val_score(lm, np.array(X).reshape(-1, 1), Y, cv=10, scoring = 'neg_mean_squared_error') 
             self.linFitScore = np.mean(scores)
             
             #print('accuracy is {} +/- {}'.format(np.mean(scores), np.std(scores)))
@@ -137,11 +137,11 @@ initialPrices = []
 for model in models:
     modelDict[model] = carModel(cars, model)
     modelDict[model].cleanData()
-    modelDict[model].linRegress()
     modelDict[model].dataMetrics()
     
     #Only analyse models for which there are enough entries
     if modelDict[model].numEntries > 100:
+        modelDict[model].linRegress()
         #Only include data that are well-described by a linear fit
         if modelDict[model].linFitScore > - 0.5:
             decayConstants.append(modelDict[model].decayConstant)
@@ -160,12 +160,3 @@ sortindices = np.argsort(initialPrices)
 plt.figure('Initial Price Bar Chart')
 plt.bar(index, np.exp(np.sort(initialPrices)))
 plt.xticks(index, models_for_analysis[sortindices], rotation=30)
-
-'''model = 'fabia'
-modelDict[model].plotPriceHist()
-xs = np.sort(modelDict[model].cars['age'])
-A = np.exp(modelDict[model].initialPrice)
-alpha = modelDict[model].decayConstant
-predict = A*np.exp(alpha*xs)
-
-plt.plot(xs, predict)'''
