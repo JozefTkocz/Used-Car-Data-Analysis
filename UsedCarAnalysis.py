@@ -76,6 +76,10 @@ class carModel:
         
         X = self.cars['age']
         Y = np.log(self.cars['price'])
+        
+        #Compute weights for the logarithmic price data
+        priceErr = 10
+        lnPriceErr = np.log(self.cars['price'] + priceErr) - np.log(priceErr)
         if len(X > 1):
             #Perform a linear regression - use cross validation to determine the validity of the fit
             lm = LinearRegression()
@@ -83,7 +87,7 @@ class carModel:
             self.linFitScore = np.mean(scores)
             
             #print('accuracy is {} +/- {}'.format(np.mean(scores), np.std(scores)))
-            lm.fit(np.array(X).reshape(-1, 1), Y)
+            lm.fit(np.array(X).reshape(-1, 1), Y, lnPriceErr)
             self.decayConstant = lm.coef_[0]
             self.initialPrice = lm.intercept_
             
@@ -94,6 +98,19 @@ class carModel:
                 plt.plot(X, lm.predict(np.array(X).reshape(-1, 1)))
                 plt.xlabel('Age (days)')
                 plt.ylabel('ln(Price (EUR))')
+                
+    def plotPriceHist(self, trend = False):
+        plt.figure(self.model + ' Price History')
+        plt.plot(self.cars['age'], self.cars['price'], 'o')
+        plt.xlabel('Car Age (days)')
+        plt.ylabel('Price (EUR)')
+        
+        if trend:
+            xs = np.sort(self.cars['age'])
+            A = np.exp(self.initialPrice)
+            alpha = self.decayConstant
+            predict = A*np.exp(alpha*xs)
+            plt.plot(xs, predict)
                 
     def dataMetrics(self):
         self.numEntries = len(self.cars)
@@ -115,6 +132,7 @@ index = np.linspace(0, len(models), len(models))
 
 decayConstants = []
 models_for_analysis = []
+initialPrices = []
 
 for model in models:
     modelDict[model] = carModel(cars, model)
@@ -127,6 +145,7 @@ for model in models:
         #Only include data that are well-described by a linear fit
         if modelDict[model].linFitScore > - 0.5:
             decayConstants.append(modelDict[model].decayConstant)
+            initialPrices.append(modelDict[model].initialPrice)
             models_for_analysis.append(model)
 
 models_for_analysis = pd.Series(models_for_analysis)
@@ -136,3 +155,17 @@ index = range(0, len(decayConstants))
 plt.figure('Decay Constant Bar Chart')
 plt.bar(index, np.sort(decayConstants))
 plt.xticks(index, models_for_analysis[sortindices], rotation=30)
+
+sortindices = np.argsort(initialPrices)
+plt.figure('Initial Price Bar Chart')
+plt.bar(index, np.exp(np.sort(initialPrices)))
+plt.xticks(index, models_for_analysis[sortindices], rotation=30)
+
+'''model = 'fabia'
+modelDict[model].plotPriceHist()
+xs = np.sort(modelDict[model].cars['age'])
+A = np.exp(modelDict[model].initialPrice)
+alpha = modelDict[model].decayConstant
+predict = A*np.exp(alpha*xs)
+
+plt.plot(xs, predict)'''
