@@ -89,7 +89,7 @@ class carModel:
             #print('accuracy is {} +/- {}'.format(np.mean(scores), np.std(scores)))
             lm.fit(np.array(X).reshape(-1, 1), Y, lnPriceErr)
             self.decayConstant = lm.coef_[0]
-            self.initialPrice = lm.intercept_
+            self.initialPrice = np.exp(lm.intercept_)
             
             #Plot the linear fit if required
             if plot:
@@ -107,7 +107,7 @@ class carModel:
         
         if trend:
             xs = np.sort(self.cars['age'])
-            A = np.exp(self.initialPrice)
+            A = self.initialPrice
             alpha = self.decayConstant
             predict = A*np.exp(alpha*xs)
             plt.plot(xs, predict)
@@ -122,10 +122,6 @@ cars.dropna(inplace=True, axis='rows')
 model = 'golf'
 
 models = cars.model.unique()
-
-test = carModel(cars, model)
-test.cleanData()
-test.linRegress(plot=True)
 
 modelDict = {}
 index = np.linspace(0, len(models), len(models))
@@ -155,8 +151,12 @@ index = range(0, len(decayConstants))
 plt.figure('Decay Constant Bar Chart')
 plt.bar(index, np.sort(decayConstants))
 plt.xticks(index, models_for_analysis[sortindices], rotation=30)
+plt.xlabel('Car Models')
+plt.ylabel('Decay Constant (days$^{-1}$)')
 
 sortindices = np.argsort(initialPrices)
 plt.figure('Initial Price Bar Chart')
-plt.bar(index, np.exp(np.sort(initialPrices)))
+plt.bar(index, np.sort(initialPrices))
 plt.xticks(index, models_for_analysis[sortindices], rotation=30)
+plt.xlabel('Car Models')
+plt.ylabel('Initial Price (EUR)')
